@@ -1,4 +1,4 @@
-PROGRAM STOKESSTATICEXAMPLE
+PROGRAM stokes_static
 
   !
   !================================================================================================================================
@@ -24,9 +24,8 @@ PROGRAM STOKESSTATICEXAMPLE
 #include "mpif.h"
 #endif
 
-
   !Test program parameters
-  REAL(CMISSRP), PARAMETER :: HEIGHT=1.0_CMISSRP
+  REAL(CMISSRP), PARAMETER :: HEIGHT=3.0_CMISSRP
   REAL(CMISSRP), PARAMETER :: WIDTH=1.0_CMISSRP
   REAL(CMISSRP), PARAMETER :: LENGTH=1.0_CMISSRP
 
@@ -42,8 +41,9 @@ PROGRAM STOKESSTATICEXAMPLE
   INTEGER(CMISSIntg), PARAMETER :: EquationsSetUserNumberStokes=10
   INTEGER(CMISSIntg), PARAMETER :: ProblemUserNumber=11
   INTEGER(CMISSIntg), PARAMETER :: GeneratedMeshUserNumber=12
+  INTEGER(CMISSIntg), PARAMETER :: AnalyticFieldUserNumber=13
 
-  INTEGER(CMISSIntg), PARAMETER :: DomainUserNumber=2
+  INTEGER(CMISSIntg), PARAMETER :: DomainUserNumber=1
   INTEGER(CMISSIntg), PARAMETER :: SolverStokesUserNumber=1
   INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumberStokesMu=1
   INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumberStokesRho=2
@@ -110,47 +110,31 @@ PROGRAM STOKESSTATICEXAMPLE
 
   !CMISS variables
 
-  !Regions
   TYPE(cmfe_RegionType) :: Region
   TYPE(cmfe_RegionType) :: WorldRegion
-  !Coordinate systems
   TYPE(cmfe_CoordinateSystemType) :: CoordinateSystem
   TYPE(cmfe_CoordinateSystemType) :: WorldCoordinateSystem
-  !Basis
   TYPE(cmfe_BasisType) :: BasisGeometry
   TYPE(cmfe_BasisType) :: BasisVelocity
   TYPE(cmfe_BasisType) :: BasisPressure
-  !Nodes
   TYPE(cmfe_NodesType) :: Nodes
-  !Elements
   TYPE(cmfe_MeshElementsType) :: MeshElementsSpace
   TYPE(cmfe_MeshElementsType) :: MeshElementsVelocity
   TYPE(cmfe_MeshElementsType) :: MeshElementsPressure
-  !Meshes
   TYPE(cmfe_MeshType) :: Mesh
   TYPE(cmfe_GeneratedMeshType) :: GeneratedMesh
-  !Decompositions
   TYPE(cmfe_DecompositionType) :: Decomposition
-  !Fields
   TYPE(cmfe_FieldsType) :: Fields
-  !Field types
-  TYPE(cmfe_FieldType) :: GeometricField
+  TYPE(cmfe_FieldType) :: GeometricField,AnalyticField
   TYPE(cmfe_FieldType) :: EquationsSetField
   TYPE(cmfe_FieldType) :: DependentFieldStokes
   TYPE(cmfe_FieldType) :: MaterialsFieldStokes
-  !Boundary conditions
   TYPE(cmfe_BoundaryConditionsType) :: BoundaryConditionsStokes
-  !Equations sets
   TYPE(cmfe_EquationsSetType) :: EquationsSetStokes
-  !Equations
   TYPE(cmfe_EquationsType) :: EquationsStokes
-  !Problems
   TYPE(cmfe_ProblemType) :: Problem
-  !Control loops
   TYPE(cmfe_ControlLoopType) :: ControlLoop
-  !Solvers
   TYPE(cmfe_SolverType) :: LinearSolverStokes
-  !Solver equations
   TYPE(cmfe_SolverEquationsType) :: SolverEquationsStokes
 
   !Generic CMISS variables
@@ -184,13 +168,13 @@ PROGRAM STOKESSTATICEXAMPLE
 
   !PROBLEM CONTROL PANEL
 
-  NUMBER_GLOBAL_X_ELEMENTS=1
+  NUMBER_GLOBAL_X_ELEMENTS=3
   NUMBER_GLOBAL_Y_ELEMENTS=3
-  NUMBER_GLOBAL_Z_ELEMENTS=1
+  NUMBER_GLOBAL_Z_ELEMENTS=3
   MESH_COMPONENT_NUMBER_SPACE=1
   MESH_COMPONENT_NUMBER_VELOCITY=1
   MESH_COMPONENT_NUMBER_PRESSURE=1
-  NUMBER_OF_DIMENSIONS=3
+  NUMBER_OF_DIMENSIONS=2
   BASIS_TYPE=CMFE_BASIS_LINEAR_LAGRANGE_INTERPOLATION
   BASIS_XI_INTERPOLATION_SPACE=CMFE_BASIS_LINEAR_LAGRANGE_INTERPOLATION
   BASIS_XI_INTERPOLATION_VELOCITY=CMFE_BASIS_LINEAR_LAGRANGE_INTERPOLATION
@@ -204,14 +188,14 @@ PROGRAM STOKESSTATICEXAMPLE
   FIXED_WALL_NODES_STOKES_FLAG=.TRUE.
   INLET_WALL_NODES_STOKES_FLAG=.TRUE.
   IF(FIXED_WALL_NODES_STOKES_FLAG) THEN
-    NUMBER_OF_FIXED_WALL_NODES_STOKES=1
+    NUMBER_OF_FIXED_WALL_NODES_STOKES=8
     ALLOCATE(FIXED_WALL_NODES_STOKES(NUMBER_OF_FIXED_WALL_NODES_STOKES))
-    FIXED_WALL_NODES_STOKES=[1]
+    FIXED_WALL_NODES_STOKES=[1,4,5,8,9,12,13,16]
   ENDIF
   IF(INLET_WALL_NODES_STOKES_FLAG) THEN
-    NUMBER_OF_INLET_WALL_NODES_STOKES=1
+    NUMBER_OF_INLET_WALL_NODES_STOKES=2
     ALLOCATE(INLET_WALL_NODES_STOKES(NUMBER_OF_INLET_WALL_NODES_STOKES))
-    INLET_WALL_NODES_STOKES=[2]
+    INLET_WALL_NODES_STOKES=[2,3]
     !Set initial boundary conditions
     BOUNDARY_CONDITIONS_STOKES(1)=0.0_CMISSRP
     BOUNDARY_CONDITIONS_STOKES(2)=1.0_CMISSRP
@@ -261,6 +245,7 @@ PROGRAM STOKESSTATICEXAMPLE
   !Start the creation of a new region
   CALL cmfe_Region_Initialise(Region,Err)
   CALL cmfe_Region_CreateStart(RegionUserNumber,WorldRegion,Region,Err)
+  CALL cmfe_Region_LabelSet(Region,"StokesRegion",Err)
   !Set the regions coordinate system as defined above
   CALL cmfe_Region_CoordinateSystemSet(Region,CoordinateSystem,Err)
   !Finish the creation of the region
@@ -291,6 +276,7 @@ PROGRAM STOKESSTATICEXAMPLE
   ENDIF
   !Finish the creation of the basis
   CALL cmfe_Basis_CreateFinish(BasisGeometry,Err)
+
   !Start the creation of another basis
   IF(BASIS_XI_INTERPOLATION_VELOCITY==BASIS_XI_INTERPOLATION_SPACE) THEN
     BasisVelocity=BasisGeometry
@@ -317,6 +303,7 @@ PROGRAM STOKESSTATICEXAMPLE
     !Finish the creation of the basis
     CALL cmfe_Basis_CreateFinish(BasisVelocity,Err)
   ENDIF
+
   !Start the creation of another basis
   IF(BASIS_XI_INTERPOLATION_PRESSURE==BASIS_XI_INTERPOLATION_SPACE) THEN
     BasisPressure=BasisGeometry
@@ -360,9 +347,14 @@ PROGRAM STOKESSTATICEXAMPLE
   !Set the default basis
   CALL cmfe_GeneratedMesh_BasisSet(GeneratedMesh,BasisGeometry,Err)
   !Define the mesh on the region
-  CALL cmfe_GeneratedMesh_ExtentSet(GeneratedMesh,[WIDTH,HEIGHT,LENGTH],Err)
-  CALL cmfe_GeneratedMesh_NumberOfElementsSet(GeneratedMesh,[NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS, &
-      & NUMBER_GLOBAL_Z_ELEMENTS],Err)
+  IF(NUMBER_OF_DIMENSIONS==2) THEN
+    CALL cmfe_GeneratedMesh_ExtentSet(GeneratedMesh,[WIDTH,HEIGHT],Err)
+    CALL cmfe_GeneratedMesh_NumberOfElementsSet(GeneratedMesh,[NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS],Err)
+  ELSE IF(NUMBER_OF_DIMENSIONS==3) THEN
+    CALL cmfe_GeneratedMesh_ExtentSet(GeneratedMesh,[WIDTH,HEIGHT,LENGTH],Err)
+    CALL cmfe_GeneratedMesh_NumberOfElementsSet(GeneratedMesh,[NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS, &
+        & NUMBER_GLOBAL_Z_ELEMENTS],Err)
+  ENDIF
   !Finish the creation of a generated mesh in the region
   CALL cmfe_Mesh_Initialise(Mesh,Err)
   CALL cmfe_GeneratedMesh_CreateFinish(GeneratedMesh,MeshUserNumber,Mesh,Err)
@@ -371,7 +363,7 @@ PROGRAM STOKESSTATICEXAMPLE
   !================================================================================================================================
   !
 
-  !GEOMETRIC FIELD
+  !MESH DECOMPOSITION
 
   !Create a decomposition
   CALL cmfe_Decomposition_Initialise(Decomposition,Err)
@@ -381,6 +373,12 @@ PROGRAM STOKESSTATICEXAMPLE
   CALL cmfe_Decomposition_NumberOfDomainsSet(Decomposition,NumberOfComputationalNodes,Err)
   !Finish the decomposition
   CALL cmfe_Decomposition_CreateFinish(Decomposition,Err)
+
+  !
+  !================================================================================================================================
+  !
+
+  !GEOMETRIC FIELD
 
   !Start to create a default (geometric) field on the region
   CALL cmfe_Field_Initialise(GeometricField,Err)
@@ -392,18 +390,14 @@ PROGRAM STOKESSTATICEXAMPLE
   !Set the scaling to use
   CALL cmfe_Field_ScalingTypeSet(GeometricField,CMFE_FIELD_NO_SCALING,Err)
   !Set the mesh component to be used by the field components.
-  !DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
-  !  CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,COMPONENT_NUMBER, &
-  !    & MESH_COMPONENT_NUMBER_SPACE,Err)
-  !ENDDO
-  CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,1,1,Err)
-  CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,2,1,Err)
-  CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,3,1,Err)
+  DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
+    CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,COMPONENT_NUMBER, &
+      & MESH_COMPONENT_NUMBER_SPACE,Err)
+  ENDDO
   !Finish creating the field
   CALL cmfe_Field_CreateFinish(GeometricField,Err)
-
-  CALL cmfe_Field_ParameterSetUpdateStart(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,CMFE_FIELD_VALUES_SET_TYPE,Err)
-  CALL cmfe_Field_ParameterSetUpdateFinish(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,CMFE_FIELD_VALUES_SET_TYPE,Err)
+  !Update the geometric field parameters
+  CALL cmfe_GeneratedMesh_GeometricParametersCalculate(GeneratedMesh,GeometricField,Err)
 
   !
   !================================================================================================================================
@@ -414,11 +408,10 @@ PROGRAM STOKESSTATICEXAMPLE
   !Create the equations set for static Stokes
   CALL cmfe_EquationsSet_Initialise(EquationsSetStokes,Err)
   CALL cmfe_Field_Initialise(EquationsSetField,Err)
+  !Set the equations set to be a static Stokes problem
   CALL cmfe_EquationsSet_CreateStart(EquationsSetUserNumberStokes,Region,GeometricField,[CMFE_EQUATIONS_SET_FLUID_MECHANICS_CLASS, &
     & CMFE_EQUATIONS_SET_STOKES_EQUATION_TYPE,CMFE_EQUATIONS_SET_STATIC_STOKES_SUBTYPE],EquationsSetFieldUserNumber, &
     & EquationsSetField,EquationsSetStokes,Err)
-  !Set the equations set to be a static Stokes problem
-
   !Finish creating the equations set
   CALL cmfe_EquationsSet_CreateFinish(EquationsSetStokes,Err)
 
@@ -430,8 +423,8 @@ PROGRAM STOKESSTATICEXAMPLE
 
   !Create the equations set dependent field variables for static Stokes
   CALL cmfe_Field_Initialise(DependentFieldStokes,Err)
-  CALL cmfe_EquationsSet_DependentCreateStart(EquationsSetStokes,DependentFieldUserNumberStokes, &
-    & DependentFieldStokes,Err)
+  CALL cmfe_EquationsSet_DependentCreateStart(EquationsSetStokes,DependentFieldUserNumberStokes,DependentFieldStokes,Err)
+  CALL cmfe_Field_VariableLabelSet(DependentFieldStokes,CMFE_FIELD_U_VARIABLE_TYPE,"U",Err)
   !Set the mesh component to be used by the field components.
   DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
     CALL cmfe_Field_ComponentMeshComponentSet(DependentFieldStokes,CMFE_FIELD_U_VARIABLE_TYPE,COMPONENT_NUMBER, &
@@ -461,14 +454,27 @@ PROGRAM STOKESSTATICEXAMPLE
 
   !Create the equations set materials field variables for static Stokes
   CALL cmfe_Field_Initialise(MaterialsFieldStokes,Err)
-  CALL cmfe_EquationsSet_MaterialsCreateStart(EquationsSetStokes,MaterialsFieldUserNumberStokes, &
-    & MaterialsFieldStokes,Err)
+  CALL cmfe_EquationsSet_MaterialsCreateStart(EquationsSetStokes,MaterialsFieldUserNumberStokes,MaterialsFieldStokes,Err)
+  CALL cmfe_Field_VariableLabelSet(MaterialsFieldStokes,CMFE_FIELD_U_VARIABLE_TYPE,"Materials",Err)
   !Finish the equations set materials field variables
   CALL cmfe_EquationsSet_MaterialsCreateFinish(EquationsSetStokes,Err)
   CALL cmfe_Field_ComponentValuesInitialise(MaterialsFieldStokes,CMFE_FIELD_U_VARIABLE_TYPE,CMFE_FIELD_VALUES_SET_TYPE, &
     & MaterialsFieldUserNumberStokesMu,MU_PARAM_STOKES,Err)
   CALL cmfe_Field_ComponentValuesInitialise(MaterialsFieldStokes,CMFE_FIELD_U_VARIABLE_TYPE,CMFE_FIELD_VALUES_SET_TYPE, &
     & MaterialsFieldUserNumberStokesRho,RHO_PARAM_STOKES,Err)
+
+  !
+  !================================================================================================================================
+  !
+
+  !ANALYTIC FIELD
+
+  !Create the equations set analytic field variables
+  CALL cmfe_Field_Initialise(AnalyticField,Err)
+  CALL cmfe_EquationsSet_AnalyticCreateStart(EquationsSetStokes,CMFE_EQUATIONS_SET_NAVIER_STOKES_EQUATION_TWO_DIM_4, &
+    & AnalyticFieldUserNumber,AnalyticField,Err)
+  !Finish the equations set analytic field variables
+  CALL cmfe_EquationsSet_AnalyticCreateFinish(EquationsSetStokes,Err)
 
   !
   !================================================================================================================================
@@ -598,6 +604,13 @@ PROGRAM STOKESSTATICEXAMPLE
   !================================================================================================================================
   !
 
+  !Output Analytic analysis
+  !Call cmfe_AnalyticAnalysis_Output(DependentFieldStokes,"StokesAnalytic",Err)
+
+  !
+  !================================================================================================================================
+  !
+
   !RUN SOLVERS
 
   !Solve the problem
@@ -611,13 +624,13 @@ PROGRAM STOKESSTATICEXAMPLE
 
   !OUTPUT
 
-  EXPORT_FIELD_IO=.TRUE.
+  EXPORT_FIELD_IO=.FALSE.
   IF(EXPORT_FIELD_IO) THEN
     WRITE(*,'(A)') "Exporting fields..."
     CALL cmfe_Fields_Initialise(Fields,Err)
     CALL cmfe_Fields_Create(Region,Fields,Err)
-    CALL cmfe_Fields_NodesExport(Fields,"StaticStokes","FORTRAN",Err)
-    CALL cmfe_Fields_ElementsExport(Fields,"StaticStokes","FORTRAN",Err)
+    CALL cmfe_Fields_NodesExport(Fields,"stokes_static","FORTRAN",Err)
+    CALL cmfe_Fields_ElementsExport(Fields,"stokes_static","FORTRAN",Err)
     CALL cmfe_Fields_Finalise(Fields,Err)
     WRITE(*,'(A)') "Field exported!"
   ENDIF
@@ -627,4 +640,4 @@ PROGRAM STOKESSTATICEXAMPLE
   WRITE(*,'(A)') "Program successfully completed."
   STOP
 
-END PROGRAM STOKESSTATICEXAMPLE
+END PROGRAM stokes_static
